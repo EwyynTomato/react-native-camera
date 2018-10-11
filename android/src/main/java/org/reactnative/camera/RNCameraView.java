@@ -4,6 +4,8 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.media.CamcorderProfile;
 import android.media.MediaActionSound;
 import android.os.Build;
@@ -12,6 +14,7 @@ import android.util.SparseArray;
 import android.view.View;
 import android.os.AsyncTask;
 import com.facebook.react.bridge.*;
+import com.facebook.react.modules.core.RCTNativeAppEventEmitter;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.google.android.cameraview.CameraView;
 import com.google.android.gms.vision.barcode.Barcode;
@@ -22,6 +25,12 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.DecodeHintType;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.Result;
+import com.reactlibrary.RNShugaOcrClient;
+import com.reactlibrary.RNShugaOcrClientAsyncResultDelegate;
+import com.reactlibrary.RNShugaTextBlockResultWrapper;
+import com.shuga.tbhelper.GraphicOverlay;
+import com.shuga.tbhelper.TextBoundingBoxGraphic;
+
 import org.reactnative.barcodedetector.RNBarcodeDetector;
 import org.reactnative.camera.tasks.*;
 import org.reactnative.camera.utils.ImageDimensions;
@@ -35,7 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class RNCameraView extends CameraView implements LifecycleEventListener, BarCodeScannerAsyncTaskDelegate, FaceDetectorAsyncTaskDelegate,
-    BarcodeDetectorAsyncTaskDelegate, TextRecognizerAsyncTaskDelegate, PictureSavedDelegate {
+    BarcodeDetectorAsyncTaskDelegate, TextRecognizerAsyncTaskDelegate, PictureSavedDelegate, RNShugaOcrClientAsyncResultDelegate {
   private ThemedReactContext mThemedReactContext;
   private Queue<Promise> mPictureTakenPromises = new ConcurrentLinkedQueue<>();
   private Map<Promise, ReadableMap> mPictureTakenOptions = new ConcurrentHashMap<>();
@@ -71,6 +80,9 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     super(themedReactContext, true);
     mThemedReactContext = themedReactContext;
     themedReactContext.addLifecycleEventListener(this);
+
+    View view = View.inflate(themedReactContext, R.layout.overlay_view, this);
+    mGraphicOverlay = view.findViewById(R.id.graphic_overlay);
 
     addCallback(new Callback() {
       @Override
@@ -122,7 +134,8 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
         boolean willCallFaceTask = mShouldDetectFaces && !faceDetectorTaskLock && cameraView instanceof FaceDetectorAsyncTaskDelegate;
         boolean willCallGoogleBarcodeTask = mShouldGoogleDetectBarcodes && !googleBarcodeDetectorTaskLock && cameraView instanceof BarcodeDetectorAsyncTaskDelegate;
         boolean willCallTextTask = mShouldRecognizeText && !textRecognizerTaskLock && cameraView instanceof TextRecognizerAsyncTaskDelegate;
-        if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask) {
+        boolean willCallTextBlockScanText = mShouldScanTextBlock && !textBlockTaskLock && cameraView instanceof RNShugaOcrClientAsyncResultDelegate;
+        if (!willCallBarCodeTask && !willCallFaceTask && !willCallGoogleBarcodeTask && !willCallTextTask && !willCallTextBlockScanText) {
           return;
         }
 
@@ -152,6 +165,17 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
           textRecognizerTaskLock = true;
           TextRecognizerAsyncTaskDelegate delegate = (TextRecognizerAsyncTaskDelegate) cameraView;
           new TextRecognizerAsyncTask(delegate, mTextRecognizer, data, width, height, correctRotation).execute();
+        }
+
+        if (willCallTextBlockScanText &&
+                (System.currentTimeMillis() - mLastTextBlockDrawnTime > mTextBlockChangeMinCooldown)) {
+          textBlockTaskLock = true;
+          mCurrentWorkingImageWidth = width;
+          mCurrentWorkingImageHeight = height;
+          mCurrentWorkingImageRotation = correctRotation;
+
+          RNShugaOcrClientAsyncResultDelegate delegate = (RNShugaOcrClientAsyncResultDelegate) cameraView;
+          mRNShugaOcrClient.scanTextInImage(data, width, height, correctRotation, delegate);
         }
       }
     });
@@ -190,6 +214,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     int paddingX = (int) ((width - correctWidth) / 2);
     int paddingY = (int) ((height - correctHeight) / 2);
     preview.layout(paddingX, paddingY, correctWidth + paddingX, correctHeight + paddingY);
+    mGraphicOverlay.layout(paddingX, paddingY, correctWidth + paddingX, correctHeight + paddingY);
   }
 
   @SuppressLint("all")
@@ -290,7 +315,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
       initBarcodeReader();
     }
     this.mShouldScanBarCodes = shouldScanBarCodes;
-    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText);
+    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText || mShouldScanTextBlock);
   }
 
   public void onBarCodeRead(Result barCode) {
@@ -344,7 +369,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
       setupFaceDetector();
     }
     this.mShouldDetectFaces = shouldDetectFaces;
-    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText);
+    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText || mShouldScanTextBlock);
   }
 
   public void setShouldGoogleDetectBarcodes(boolean shouldDetectBarcodes) {
@@ -352,7 +377,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
       setupBarcodeDetector();
     }
     this.mShouldGoogleDetectBarcodes = shouldDetectBarcodes;
-    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText);
+    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText || mShouldScanTextBlock);
   }
 
   public void onFacesDetected(SparseArray<Face> facesReported, int sourceWidth, int sourceHeight, int sourceRotation) {
@@ -429,7 +454,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
       setupTextRecongnizer();
     }
     this.mShouldRecognizeText = shouldRecognizeText;
-    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText);
+    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText || mShouldScanTextBlock);
   }
 
   @Override
@@ -493,5 +518,138 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
     } else {
       return true;
     }
+  }
+
+  /**
+   * Shuga Text Block Recognition
+   */
+  private static final String RNSHUGA_OCR_EMITTED_EVENT_NAME = "RNShugaOcrEvent"; //If you change this, remember to also change it in index.js
+  private boolean mShouldScanTextBlock = false;
+  private GraphicOverlay mGraphicOverlay;
+  private boolean textBlockTaskLock = false;
+  private RNShugaOcrClient mRNShugaOcrClient;
+  private long mLastTextBlockDrawnTime;
+  private int mTextBlockChangeMinCooldown;
+  private int mTextBlockMinThreshold;
+  private int mTextBlockMaxThreshold;
+  private String mTextBlockGoodStrokeColor;
+  private float mTextBlockGoodStrokeWidth;
+  private String mTextBlockBadStrokeColor;
+  private float mTextBlockBadStrokeWidth;
+
+  private int mCurrentWorkingImageWidth; //width of current image being processed, needed to calculate scale of image <-> view
+  private int mCurrentWorkingImageHeight; //height of current image being processed, needed to calculate scale of image <-> view
+  private int mCurrentWorkingImageRotation; //rotation of current image being processed, needed to calculate scale of image <-> view
+
+  public void setShouldScanTextBlock(boolean shouldScanTextBlock) {
+    if (shouldScanTextBlock && mRNShugaOcrClient == null) {
+      setupShugaTextBlockScanner();
+    }
+    this.mShouldScanTextBlock = shouldScanTextBlock;
+    setScanning(mShouldDetectFaces || mShouldGoogleDetectBarcodes || mShouldScanBarCodes || mShouldRecognizeText || mShouldScanTextBlock);
+  }
+
+  public void setTextBlockChangeMinimumCooldown(int minCooldown) {
+    this.mTextBlockChangeMinCooldown = minCooldown;
+  }
+
+  public void setTextBlockMinThreshold(int minThreshold) {
+    this.mTextBlockMinThreshold = minThreshold;
+  }
+
+  public void setTextBlockMaxThreshold(int maxThreshold) {
+    this.mTextBlockMaxThreshold = maxThreshold;
+  }
+
+  public void setTextBlockGoodStrokeColor(String strokeColor) {
+    this.mTextBlockGoodStrokeColor = strokeColor;
+  }
+
+  public void setTextBlockGoodStrokeWidth(float strokeWidth) {
+    this.mTextBlockGoodStrokeWidth = strokeWidth;
+  }
+
+  public void setTextBlockBadStrokeColor(String strokeColor) {
+    this.mTextBlockBadStrokeColor = strokeColor;
+  }
+
+  public void setTextBlockBadStrokeWidth(float strokeWidth) {
+    this.mTextBlockBadStrokeWidth = strokeWidth;
+  }
+
+  public void setupShugaTextBlockScanner() {
+    this.mRNShugaOcrClient = new RNShugaOcrClient();
+  }
+
+  @Override
+  public void onRNShugaOcrFailure(String message) {
+    mGraphicOverlay.clear(); //Clear our view from prev rectangles and draw nothing
+
+    RCTNativeAppEventEmitter eventEmitter = mThemedReactContext.getJSModule(RCTNativeAppEventEmitter.class);
+    WritableMap map = Arguments.createMap();
+    map.putString("error", message);
+    map.putArray("result", null);
+    eventEmitter.emit(RNSHUGA_OCR_EMITTED_EVENT_NAME, map);
+
+    textBlockTaskLock = false;
+  }
+
+  @Override
+  public void onRNShugaOcrSuccess(RNShugaTextBlockResultWrapper resultWrapper) {
+    //TODO: cooldown
+    //TODO: min & max threshold
+    mGraphicOverlay.clear();
+    WritableArray rnResult = resultWrapper.getResultForReactNative();
+
+    /**
+     * Calculates the view to image ratio
+     * NOTE: if image rotation is 90 or 270, then width and height should be reversed in calculating ratio (THIS HAPPENS MORE THAN YOU THINK)
+     */
+    int viewWidth = mGraphicOverlay.getWidth();
+    int viewHeight = mGraphicOverlay.getHeight();
+    if (mCurrentWorkingImageRotation == 90 || mCurrentWorkingImageRotation == 270) {
+      int temp = mCurrentWorkingImageHeight;
+      mCurrentWorkingImageHeight = mCurrentWorkingImageWidth;
+      mCurrentWorkingImageWidth = temp;
+    }
+    float xratio = viewWidth / (mCurrentWorkingImageWidth * 1.0f);
+    float yratio = viewHeight / (mCurrentWorkingImageHeight * 1.0f);
+
+    // Create the scaled rectangle object
+    RectF rect = new RectF(new Rect(Math.round(resultWrapper.getMinLeft() * xratio),
+            Math.round(resultWrapper.getMinTop() * yratio),
+            Math.round(resultWrapper.getMaxRight() * xratio),
+            Math.round(resultWrapper.getMaxBottom() * yratio)));
+
+    //Check if rectangle object get past our threshold
+    float rectArea = rect.width() * rect.height();
+    float viewArea = viewWidth * viewHeight;
+    int textBlockToViewRatio = Math.round(rectArea / viewArea * 100);
+
+    if (mTextBlockMinThreshold <= textBlockToViewRatio && textBlockToViewRatio <= mTextBlockMaxThreshold) {
+      //: Rectangle is within our expectation
+      if (mTextBlockGoodStrokeWidth != 0) {
+        GraphicOverlay.Graphic mainBox = new TextBoundingBoxGraphic(mGraphicOverlay, rect, Color.parseColor(mTextBlockGoodStrokeColor), mTextBlockGoodStrokeWidth);
+        mGraphicOverlay.add(mainBox);
+      }
+
+      mLastTextBlockDrawnTime = System.currentTimeMillis();
+    } else {
+      //: Rectangle doesn't get past our threshold, return empty array
+      rnResult = Arguments.createArray();
+
+      if (mTextBlockBadStrokeWidth != 0) {
+        GraphicOverlay.Graphic mainBox = new TextBoundingBoxGraphic(mGraphicOverlay, rect, Color.parseColor(mTextBlockBadStrokeColor), mTextBlockBadStrokeWidth);
+        mGraphicOverlay.add(mainBox);
+      }
+    }
+
+    RCTNativeAppEventEmitter eventEmitter = mThemedReactContext.getJSModule(RCTNativeAppEventEmitter.class);
+    WritableMap map = Arguments.createMap();
+    map.putString("error", null);
+    map.putArray("result", rnResult);
+    eventEmitter.emit(RNSHUGA_OCR_EMITTED_EVENT_NAME, map);
+
+    textBlockTaskLock = false;
   }
 }

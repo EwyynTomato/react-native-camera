@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Text,
   StyleSheet,
+  NativeEventEmitter,
 } from 'react-native';
 
 import type { FaceFeature } from './FaceDetector';
@@ -439,6 +440,22 @@ export default class Camera extends React.Component<PropsType, StateType> {
       newProps.textRecognizerEnabled = true;
     }
 
+    if (props.onTextBlockDetectionChange) {
+      newProps.textBlockScannerEnabled = true;
+      newProps.textBlockChangeMinimumCooldown = props.textBlockChangeMinimumCooldown || 200;
+      newProps.textBlockMinThreshold = props.textBlockMinThreshold || 0;
+      newProps.textBlockMaxThreshold = props.textBlockMaxThreshold || 100;
+      newProps.textBlockGoodStrokeColor = props.textBlockGoodStrokeColor || "#fff";
+      newProps.textBlockGoodStrokeWidth = props.textBlockGoodStrokeWidth || 0;
+      newProps.textBlockBadStrokeColor = props.textBlockBadStrokeColor || "#000";
+      newProps.textBlockBadStrokeWidth = props.textBlockBadStrokeWidth || 0;
+
+      //We're breaking the code style of this original package, but this is easier for future maintainer to cherry pick
+      new NativeEventEmitter(CameraManager).addListener('RNShugaOcrEvent', (data) => {
+        props.onTextBlockDetectionChange(data);
+      });
+    }
+
     if (Platform.OS === 'ios') {
       delete newProps.googleVisionBarcodeType;
       delete newProps.googleVisionBarcodeDetectorEnabled;
@@ -478,5 +495,15 @@ const RNCamera = requireNativeComponent('RNCamera', Camera, {
     onMountError: true,
     renderToHardwareTextureAndroid: true,
     testID: true,
+
+    textBlockScannerEnabled: true,
+    onTextBlockDetectionChange: true,
+    textBlockChangeMinimumCooldown: true,
+    textBlockMinThreshold: true,
+    textBlockMaxThreshold: true,
+    textBlockGoodStrokeColor: true,
+    textBlockGoodStrokeWidth: true,
+    textBlockBadStrokeColor: true,
+    textBlockBadStrokeWidth: true,
   },
 });

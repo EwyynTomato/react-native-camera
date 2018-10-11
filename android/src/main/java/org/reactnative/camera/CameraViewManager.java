@@ -168,4 +168,44 @@ public class CameraViewManager extends ViewGroupManager<RNCameraView> {
   public void setTextRecognizing(RNCameraView view, boolean textRecognizerEnabled) {
     view.setShouldRecognizeText(textRecognizerEnabled);
   }
+
+  @ReactProp(name = "textBlockScannerEnabled")
+  public void setTextBlockScannerEnabled(RNCameraView view, boolean textBlockScannerEnabled) {
+    view.setShouldScanTextBlock(textBlockScannerEnabled);
+  }
+
+  @ReactProp(name = "textBlockChangeMinimumCooldown")
+  public void setTextBlockChangeMinimumCooldown(RNCameraView view, int textBlockChangeMinimumCooldown) {
+    view.setTextBlockChangeMinimumCooldown(textBlockChangeMinimumCooldown);
+  }
+
+  @ReactProp(name = "textBlockMinThreshold")
+  public void setTextBlockMinThreshold(RNCameraView view, int textBlockMinThreshold) {
+    view.setTextBlockMinThreshold(textBlockMinThreshold);
+  }
+
+  @ReactProp(name = "textBlockMaxThreshold")
+  public void setTextBlockMaxThreshold(RNCameraView view, int textBlockMaxThreshold) {
+    view.setTextBlockMaxThreshold(textBlockMaxThreshold);
+  }
+
+  @ReactProp(name = "textBlockGoodStrokeColor")
+  public void setTextBlockGoodStrokeColor(RNCameraView view, String value) {
+    view.setTextBlockGoodStrokeColor(value);
+  }
+
+  @ReactProp(name = "textBlockGoodStrokeWidth")
+  public void setTextBlockGoodStrokeWidth(RNCameraView view, float value) {
+    view.setTextBlockGoodStrokeWidth(value);
+  }
+
+  @ReactProp(name = "textBlockBadStrokeColor")
+  public void setTextBlockBadStrokeColor(RNCameraView view, String value) {
+    view.setTextBlockBadStrokeColor(value);
+  }
+
+  @ReactProp(name = "textBlockBadStrokeWidth")
+  public void setTextBlockBadStrokeWidth(RNCameraView view, float value) {
+    view.setTextBlockBadStrokeWidth(value);
+  }
 }
