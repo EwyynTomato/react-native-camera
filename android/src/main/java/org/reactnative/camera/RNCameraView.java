@@ -596,8 +596,6 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
 
   @Override
   public void onRNShugaOcrSuccess(RNShugaTextBlockResultWrapper resultWrapper) {
-    //TODO: cooldown
-    //TODO: min & max threshold
     mGraphicOverlay.clear();
     WritableArray rnResult = resultWrapper.getResultForReactNative();
 
