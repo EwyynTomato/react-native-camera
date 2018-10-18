@@ -9,12 +9,12 @@ import android.graphics.RectF;
 import android.media.CamcorderProfile;
 import android.media.MediaActionSound;
 import android.os.Build;
+import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
 import android.util.SparseArray;
 import android.view.View;
 import android.os.AsyncTask;
 import com.facebook.react.bridge.*;
-import com.facebook.react.modules.core.RCTNativeAppEventEmitter;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.google.android.cameraview.CameraView;
 import com.google.android.gms.vision.barcode.Barcode;
@@ -585,11 +585,7 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
   public void onRNShugaOcrFailure(String message) {
     mGraphicOverlay.clear(); //Clear our view from prev rectangles and draw nothing
 
-    RCTNativeAppEventEmitter eventEmitter = mThemedReactContext.getJSModule(RCTNativeAppEventEmitter.class);
-    WritableMap map = Arguments.createMap();
-    map.putString("error", message);
-    map.putArray("result", null);
-    eventEmitter.emit(RNSHUGA_OCR_EMITTED_EVENT_NAME, map);
+    emitTextBlockChangeEvent(null, message);
 
     textBlockTaskLock = false;
   }
@@ -642,12 +638,16 @@ public class RNCameraView extends CameraView implements LifecycleEventListener, 
       }
     }
 
-    RCTNativeAppEventEmitter eventEmitter = mThemedReactContext.getJSModule(RCTNativeAppEventEmitter.class);
-    WritableMap map = Arguments.createMap();
-    map.putString("error", null);
-    map.putArray("result", rnResult);
-    eventEmitter.emit(RNSHUGA_OCR_EMITTED_EVENT_NAME, map);
+    emitTextBlockChangeEvent(rnResult, null);
 
     textBlockTaskLock = false;
+  }
+
+  private void emitTextBlockChangeEvent(@Nullable WritableArray result, @Nullable String errorMessage) {
+    WritableMap map = Arguments.createMap();
+    map.putInt("time", (int) (System.currentTimeMillis() % Integer.MAX_VALUE)); //event emitter coalescing key
+    map.putString("error", errorMessage);
+    map.putArray("result", result);
+    RNCameraViewHelper.emitTextBlockChangeEvent(this, map);
   }
 }

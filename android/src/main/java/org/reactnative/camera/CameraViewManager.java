@@ -24,6 +24,7 @@ public class CameraViewManager extends ViewGroupManager<RNCameraView> {
     EVENT_ON_BARCODE_DETECTION_ERROR("onGoogleVisionBarcodeDetectionError"),
     EVENT_ON_TEXT_RECOGNIZED("onTextRecognized"),
     EVENT_ON_PICTURE_TAKEN("onPictureTaken"),
+    EVENT_ON_TEXTBLOCK_DETECTION_CHANGE("onTextBlockDetectionChange"),
     EVENT_ON_PICTURE_SAVED("onPictureSaved");
 
     private final String mName;

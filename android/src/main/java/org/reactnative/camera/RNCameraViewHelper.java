@@ -273,6 +273,12 @@ public class RNCameraViewHelper {
     reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher().dispatchEvent(event);
   }
 
+  public static void emitTextBlockChangeEvent(ViewGroup view, WritableMap response) {
+    TextBlockDetectionChangeEvent event = TextBlockDetectionChangeEvent.obtain(view.getId(), response);
+    ReactContext reactContext = (ReactContext) view.getContext();
+    reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher().dispatchEvent(event);
+  }
+
   // Utilities
 
   public static int getCorrectCameraRotation(int rotation, int facing) {

@@ -98,6 +98,7 @@ type PropsType = typeof View.props & {
   faceDetectionClassifications?: number,
   onFacesDetected?: ({ faces: Array<TrackedFaceFeature> }) => void,
   onTextRecognized?: ({ textBlocks: Array<TrackedTextFeature> }) => void,
+  onTextBlockDetectionChange?: Function,
   captureAudio?: boolean,
   useCamera2Api?: boolean,
   playSoundOnCapture?: boolean,
@@ -189,6 +190,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     onGoogleVisionBarcodesDetected: PropTypes.func,
     onFacesDetected: PropTypes.func,
     onTextRecognized: PropTypes.func,
+    onTextBlockDetectionChange: PropTypes.func,
     faceDetectionMode: PropTypes.number,
     faceDetectionLandmarks: PropTypes.number,
     faceDetectionClassifications: PropTypes.number,
@@ -409,6 +411,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
           onBarCodeRead={this._onObjectDetected(this.props.onBarCodeRead)}
           onFacesDetected={this._onObjectDetected(this.props.onFacesDetected)}
           onTextRecognized={this._onObjectDetected(this.props.onTextRecognized)}
+          onTextBlockDetectionChange={this._onObjectDetected(this.props.onTextBlockDetectionChange)}
           onPictureSaved={this._onPictureSaved}
         >
           {this.renderChildren()}
@@ -449,11 +452,6 @@ export default class Camera extends React.Component<PropsType, StateType> {
       newProps.textBlockGoodStrokeWidth = props.textBlockGoodStrokeWidth || 0;
       newProps.textBlockBadStrokeColor = props.textBlockBadStrokeColor || "#000";
       newProps.textBlockBadStrokeWidth = props.textBlockBadStrokeWidth || 0;
-
-      //We're breaking the code style of this original package, but this is easier for future maintainer to cherry pick
-      new NativeEventEmitter(CameraManager).addListener('RNShugaOcrEvent', (data) => {
-        props.onTextBlockDetectionChange(data);
-      });
     }
 
     if (Platform.OS === 'ios') {
