@@ -18,6 +18,7 @@ RCT_EXPORT_VIEW_PROPERTY(onBarCodeRead, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onFacesDetected, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onPictureSaved, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onTextRecognized, RCTDirectEventBlock);
+RCT_EXPORT_VIEW_PROPERTY(onTextBlockDetectionChange, RCTDirectEventBlock);
 
 + (BOOL)requiresMainQueueSetup
 {
@@ -74,7 +75,7 @@ RCT_EXPORT_VIEW_PROPERTY(onTextRecognized, RCTDirectEventBlock);
 
 - (NSArray<NSString *> *)supportedEvents
 {
-    return @[@"onCameraReady", @"onMountError", @"onBarCodeRead", @"onFacesDetected", @"onPictureSaved", @"onTextRecognized"];
+    return @[@"onCameraReady", @"onMountError", @"onBarCodeRead", @"onFacesDetected", @"onPictureSaved", @"onTextRecognized", @"onTextBlockDetectionChange"];
 }
 
 + (NSDictionary *)validCodecTypes
@@ -242,6 +243,47 @@ RCT_CUSTOM_VIEW_PROPERTY(textRecognizerEnabled, BOOL, RNCamera)
     
     view.canReadText = [RCTConvert BOOL:json];
     [view setupOrDisableTextDetector];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(textBlockDetectionEnabled, BOOL, RNCamera)
+{
+    [view setCanDetectTextBlock:[RCTConvert BOOL:json]];
+    [view setupOrDisableTextBlockDetector];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(textBlockChangeMinimumCooldown, NSInteger, RNCamera)
+{
+    [view setTextBlockChangeMinimumCooldown:[RCTConvert NSInteger:json]];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(textBlockGoodStrokeColor, NSString *, RNCamera)
+{
+    [view setTextBlockGoodStrokeColor:[RCTConvert NSString:json]];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(textBlockGoodStrokeWidth, NSNumber, RNCamera)
+{
+    [view setTextBlockGoodStrokeWidth:[RCTConvert float:json]];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(textBlockMinThreshold, NSInteger, RNCamera)
+{
+    [view setTextBlockMinThreshold:[RCTConvert int:json]];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(textBlockMaxThreshold, NSInteger, RNCamera)
+{
+    [view setTextBlockMaxThreshold:[RCTConvert int:json]];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(textBlockBadStrokeColor, NSString *, RNCamera)
+{
+    [view setTextBlockBadStrokeColor:[RCTConvert NSString:json]];
+}
+
+RCT_CUSTOM_VIEW_PROPERTY(textBlockBadStrokeWidth, NSNumber, RNCamera)
+{
+    [view setTextBlockBadStrokeWidth:[RCTConvert float:json]];
 }
 
 RCT_REMAP_METHOD(takePicture,

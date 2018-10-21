@@ -23,6 +23,7 @@
 		71D5C72B201B8A320030A15E /* RNFaceDetectorModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 7147DBB520155340003C59C3 /* RNFaceDetectorModule.m */; };
 		71D5C72C201B8A360030A15E /* RNFaceDetectorManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 7147DBB22015319E003C59C3 /* RNFaceDetectorManager.m */; };
 		9FE592B31CA3CBF500788287 /* RCTSensorOrientationChecker.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FE592B21CA3CBF500788287 /* RCTSensorOrientationChecker.m */; };
+		AA2CDF51217CE06B00AADD4D /* DrawingUtility.m in Sources */ = {isa = PBXBuildFile; fileRef = AA2CDF50217CE06B00AADD4D /* DrawingUtility.m */; };
 		F8393BEC21469C0000AB1995 /* RNSensorOrientationChecker.m in Sources */ = {isa = PBXBuildFile; fileRef = F8393BEB21469C0000AB1995 /* RNSensorOrientationChecker.m */; };
 /* End PBXBuildFile section */
 
@@ -71,6 +72,8 @@
 		71C7FFD52013C824006EB75A /* RNFileSystem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RNFileSystem.m; sourceTree = "<group>"; };
 		9FE592B11CA3CBF500788287 /* RCTSensorOrientationChecker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RCTSensorOrientationChecker.h; sourceTree = "<group>"; };
 		9FE592B21CA3CBF500788287 /* RCTSensorOrientationChecker.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RCTSensorOrientationChecker.m; sourceTree = "<group>"; };
+		AA2CDF4F217CE06B00AADD4D /* DrawingUtility.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DrawingUtility.h; sourceTree = "<group>"; };
+		AA2CDF50217CE06B00AADD4D /* DrawingUtility.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = DrawingUtility.m; sourceTree = "<group>"; };
 		F8393BEA21469C0000AB1995 /* RNSensorOrientationChecker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RNSensorOrientationChecker.h; sourceTree = "<group>"; };
 		F8393BEB21469C0000AB1995 /* RNSensorOrientationChecker.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RNSensorOrientationChecker.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -123,6 +126,8 @@
 		714166162013E1B600EE9FCC /* RN */ = {
 			isa = PBXGroup;
 			children = (
+				AA2CDF4F217CE06B00AADD4D /* DrawingUtility.h */,
+				AA2CDF50217CE06B00AADD4D /* DrawingUtility.m */,
 				F8393BEA21469C0000AB1995 /* RNSensorOrientationChecker.h */,
 				F8393BEB21469C0000AB1995 /* RNSensorOrientationChecker.m */,
 				71C7FFD42013C824006EB75A /* RNFileSystem.h */,
@@ -224,6 +229,7 @@
 				4107014D1ACB732B00C6AA39 /* RCTCamera.m in Sources */,
 				71D5C72A201B8A2F0030A15E /* RNFaceDetectorPointTransformCalculator.m in Sources */,
 				F8393BEC21469C0000AB1995 /* RNSensorOrientationChecker.m in Sources */,
+				AA2CDF51217CE06B00AADD4D /* DrawingUtility.m in Sources */,
 				71C7FFD02013C7E5006EB75A /* RNCameraUtils.m in Sources */,
 				7162BE682013EAA400FE51FF /* RNCameraManager.m in Sources */,
 				7162BE672013EAA100FE51FF /* RNCamera.m in Sources */,
@@ -289,6 +295,7 @@
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/../../../React/**",
 					"$(SRCROOT)/../../react-native/React/**",
+					"$(SRCROOT)/../../react-native-shuga-ocr/ios/**",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 8.2;
 				LIBRARY_SEARCH_PATHS = "";
@@ -336,6 +343,7 @@
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/../../../React/**",
 					"$(SRCROOT)/../../react-native/React/**",
+					"$(SRCROOT)/../../react-native-shuga-ocr/ios/**",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 8.2;
 				LIBRARY_SEARCH_PATHS = "";

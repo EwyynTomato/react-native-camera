@@ -443,8 +443,8 @@ export default class Camera extends React.Component<PropsType, StateType> {
       newProps.textRecognizerEnabled = true;
     }
 
-    if (props.onTextBlockDetectionChange) {
-      newProps.textBlockScannerEnabled = true;
+    if (props.textBlockDetectionEnabled) {
+      newProps.textBlockDetectionEnabled = true;
       newProps.textBlockChangeMinimumCooldown = props.textBlockChangeMinimumCooldown || 200;
       newProps.textBlockMinThreshold = props.textBlockMinThreshold || 0;
       newProps.textBlockMaxThreshold = props.textBlockMaxThreshold || 100;
@@ -494,7 +494,7 @@ const RNCamera = requireNativeComponent('RNCamera', Camera, {
     renderToHardwareTextureAndroid: true,
     testID: true,
 
-    textBlockScannerEnabled: true,
+    textBlockDetectionEnabled: true,
     onTextBlockDetectionChange: true,
     textBlockChangeMinimumCooldown: true,
     textBlockMinThreshold: true,

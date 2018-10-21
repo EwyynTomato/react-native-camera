@@ -15,6 +15,8 @@
 #import "TextDetectorManagerStub.h"
 #endif
 
+#import "RNShugaOcr.h"
+
 @class RNCamera;
 
 @interface RNCamera : UIView <AVCaptureMetadataOutputObjectsDelegate, AVCaptureFileOutputRecordingDelegate, RNFaceDetectorDelegate, AVCaptureVideoDataOutputSampleBufferDelegate>
@@ -41,6 +43,15 @@
 @property (nonatomic, assign) BOOL isReadingBarCodes;
 @property (nonatomic, assign) BOOL isDetectingFaces;
 @property (nonatomic, assign) BOOL canReadText;
+@property (nonatomic, assign) BOOL isTextBlockDetectionRunning;
+@property (nonatomic, assign) BOOL canDetectTextBlock;
+@property (nonatomic, assign) NSInteger textBlockChangeMinimumCooldown;
+@property (nonatomic, strong) NSString *textBlockGoodStrokeColor;
+@property (nonatomic, assign) float textBlockGoodStrokeWidth;
+@property (nonatomic, assign) int textBlockMinThreshold;
+@property (nonatomic, assign) int textBlockMaxThreshold;
+@property (nonatomic, strong) NSString *textBlockBadStrokeColor;
+@property (nonatomic, assign) float textBlockBadStrokeWidth;
 @property(assign, nonatomic) AVVideoCodecType videoCodecType;
 @property (assign, nonatomic) AVCaptureVideoStabilizationMode videoStabilizationMode;
 
@@ -66,6 +77,7 @@
 - (void)pausePreview;
 - (void)setupOrDisableBarcodeScanner;
 - (void)setupOrDisableTextDetector;
+- (void)setupOrDisableTextBlockDetector;
 - (void)onReady:(NSDictionary *)event;
 - (void)onMountingError:(NSDictionary *)event;
 - (void)onCodeRead:(NSDictionary *)event;

@@ -7,6 +7,8 @@
 #import <React/RCTUtils.h>
 #import <React/UIView+React.h>
 #import  "RNSensorOrientationChecker.h"
+#import <math.h>
+#import "DrawingUtility.h"
 @interface RNCamera ()
 
 @property (nonatomic, weak) RCTBridge *bridge;
@@ -17,6 +19,8 @@
 @property (nonatomic, strong) RCTPromiseRejectBlock videoRecordedReject;
 @property (nonatomic, strong) id faceDetectorManager;
 @property (nonatomic, strong) id textDetector;
+@property (nonatomic, strong) id textBlockDetector;
+@property (nonatomic, strong) UIView *blockDrawingView; //Shuga Text block drawing layer
 
 @property (nonatomic, copy) RCTDirectEventBlock onCameraReady;
 @property (nonatomic, copy) RCTDirectEventBlock onMountError;
@@ -24,6 +28,7 @@
 @property (nonatomic, copy) RCTDirectEventBlock onTextRecognized;
 @property (nonatomic, copy) RCTDirectEventBlock onFacesDetected;
 @property (nonatomic, copy) RCTDirectEventBlock onPictureSaved;
+@property (nonatomic, copy) RCTDirectEventBlock onTextBlockDetectionChange;
 @property (nonatomic, assign) BOOL finishedReadingText;
 @property (nonatomic, copy) NSDate *start;
 
@@ -36,11 +41,15 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
 - (id)initWithBridge:(RCTBridge *)bridge
 {
     if ((self = [super init])) {
+        self.blockDrawingView = [[UIView alloc] init];
+        [self addSubview:self.blockDrawingView];
+        
         self.bridge = bridge;
         self.session = [AVCaptureSession new];
         self.sessionQueue = dispatch_queue_create("cameraQueue", DISPATCH_QUEUE_SERIAL);
         self.sensorOrientationChecker = [RNSensorOrientationChecker new];
         self.textDetector = [self createTextDetector];
+        self.textBlockDetector = [self createTextBlockDetector];
         self.finishedReadingText = true;
         self.start = [NSDate date];
         self.faceDetectorManager = [self createFaceDetectorManager];
@@ -114,6 +123,8 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
     self.previewLayer.frame = self.bounds;
     [self setBackgroundColor:[UIColor blackColor]];
     [self.layer insertSublayer:self.previewLayer atIndex:0];
+    
+    self.blockDrawingView.frame = self.bounds;
 }
 
 - (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex
@@ -597,7 +608,11 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
             self.stillImageOutput = stillImageOutput;
         }
 
-#if __has_include(<GoogleMobileVision/GoogleMobileVision.h>)
+#if __has_include("RNShugaOcr.h")
+        if (self.canDetectTextBlock) {
+            [self setupOrDisableTextBlockDetector];
+        }
+#elif __has_include(<GoogleMobileVision/GoogleMobileVision.h>)
         [_faceDetectorManager maybeStartFaceDetectionOnSession:_session withPreviewLayer:_previewLayer];
         if ([self.textDetector isRealDetector]) {
             [self setupOrDisableTextDetector];
@@ -1064,31 +1079,50 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
     didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
            fromConnection:(AVCaptureConnection *)connection
 {
-    if (![self.textDetector isRealDetector]) {
-        return;
-    }
-
-    // Do not submit image for text recognition too often:
-    // 1. we only dispatch events every 500ms anyway
-    // 2. wait until previous recognition is finished
-    // 3. let user disable text recognition, e.g. onTextRecognized={someCondition ? null : this.textRecognized}
-    NSDate *methodFinish = [NSDate date];
-    NSTimeInterval timePassed = [methodFinish timeIntervalSinceDate:self.start];
-    if (timePassed > 0.5 && _finishedReadingText && [self canReadText]) {
-        CGSize previewSize = CGSizeMake(_previewLayer.frame.size.width, _previewLayer.frame.size.height);
-        UIImage *image = [RNCameraUtils convertBufferToUIImage:sampleBuffer previewSize:previewSize];
-        // take care of the fact that preview dimensions differ from the ones of the image that we submit for text detection
-        float scaleX = _previewLayer.frame.size.width / image.size.width;
-        float scaleY = _previewLayer.frame.size.height / image.size.height;
-
-        // find text features
-        _finishedReadingText = false;
-        self.start = [NSDate date];
-        NSArray *textBlocks = [self.textDetector findTextBlocksInFrame:image scaleX:scaleX scaleY:scaleY];
-        NSDictionary *eventText = @{@"type" : @"TextBlock", @"textBlocks" : textBlocks};
-        [self onText:eventText];
-
-        _finishedReadingText = true;
+    if (self.canDetectTextBlock) {
+        //TODO: time cooldown
+        NSDate *methodFinish = [NSDate date];
+        NSTimeInterval timePassed = [methodFinish timeIntervalSinceDate:self.start];
+        
+        if (timePassed > (self.textBlockChangeMinimumCooldown/1000)) {
+            if (!self.isTextBlockDetectionRunning) {
+                self.start = [NSDate date];
+                
+                AVCaptureVideoOrientation orientation = connection.videoOrientation;
+                if (orientation != AVCaptureVideoOrientationPortrait) { //Shuga: portrait only
+                    [connection setVideoOrientation:AVCaptureVideoOrientationPortrait];
+                }
+                self.isTextBlockDetectionRunning = true;
+                [self detectTextBlockFromBuffer:sampleBuffer];
+            }
+        }
+    } else {
+        if (![self.textDetector isRealDetector]) {
+            return;
+        }
+        
+        // Do not submit image for text recognition too often:
+        // 1. we only dispatch events every 500ms anyway
+        // 2. wait until previous recognition is finished
+        // 3. let user disable text recognition, e.g. onTextRecognized={someCondition ? null : this.textRecognized}
+        NSDate *methodFinish = [NSDate date];
+        NSTimeInterval timePassed = [methodFinish timeIntervalSinceDate:self.start];
+        if (timePassed > 0.5 && _finishedReadingText && [self canReadText]) {
+            CGSize previewSize = CGSizeMake(_previewLayer.frame.size.width, _previewLayer.frame.size.height);
+            UIImage *image = [RNCameraUtils convertBufferToUIImage:sampleBuffer previewSize:previewSize];
+            // take care of the fact that preview dimensions differ from the ones of the image that we submit for text detection
+            float scaleX = _previewLayer.frame.size.width / image.size.width;
+            float scaleY = _previewLayer.frame.size.height / image.size.height;
+            
+            // find text features
+            _finishedReadingText = false;
+            self.start = [NSDate date];
+            NSArray *textBlocks = [self.textDetector findTextBlocksInFrame:image scaleX:scaleX scaleY:scaleY];
+            NSDictionary *eventText = @{@"type" : @"TextBlock", @"textBlocks" : textBlocks};
+            [self onText:eventText];
+            
+            _finishedReadingText = true;
+        }
     }
 }
 
@@ -1098,6 +1132,157 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
     [self.session removeOutput:self.videoDataOutput];
     }
     self.videoDataOutput = nil;
+}
+
+# pragma mark - Shuga Text Block Detector
+
+-(id)createTextBlockDetector
+{
+    return [[RNShugaOcr alloc] init];
+}
+
+- (void)setupOrDisableTextBlockDetector
+{
+    if ([self canDetectTextBlock]) {
+        //NOTE: videoDataOutput is used by both text detector and text block detector
+        self.videoDataOutput = [[AVCaptureVideoDataOutput alloc] init];
+        if (![self.session canAddOutput:_videoDataOutput]) {
+            NSLog(@"Failed to setup video data output for text block detection");
+            return;
+        }
+        NSDictionary *rgbOutputSettings = [NSDictionary
+                                           dictionaryWithObject:[NSNumber numberWithInt:kCMPixelFormat_32BGRA]
+                                           forKey:(id)kCVPixelBufferPixelFormatTypeKey];
+        [self.videoDataOutput setVideoSettings:rgbOutputSettings];
+        [self.videoDataOutput setAlwaysDiscardsLateVideoFrames:YES];
+        [self.videoDataOutput setSampleBufferDelegate:self queue:self.sessionQueue];
+        [self.session addOutput:_videoDataOutput];
+    }
+}
+
+- (void)detectTextBlockFromBuffer:(CMSampleBufferRef)buffer {
+    CGImageRef cgimage = [self imageFromSampleBuffer:buffer]; //buffer must be consumed outside of block
+    CGFloat imageWidth = CGImageGetWidth(cgimage);
+    CGFloat imageHeight = CGImageGetHeight(cgimage);
+    CFRelease(cgimage); //<- prevent memory leak!
+    
+    [self.textBlockDetector scanTextInBuffer:buffer success:^(NSArray *successResult) {
+        dispatch_async (dispatch_get_main_queue(), ^{
+            // Remove all previous drawing
+            NSArray *viewsToRemove = [self.blockDrawingView subviews];
+            for (UIView *v in viewsToRemove) {
+                [v removeFromSuperview];
+            }
+            
+            //find out the image to drawing uiview scale
+            //ignore xscale as it's cropped in preview
+            CGFloat yscale = self.blockDrawingView.frame.size.height / imageHeight;
+            
+            //Calculate the position of & draw text block
+            double minLeft = imageWidth;
+            double maxRight = 0;
+            double minTop = imageHeight;
+            double maxBottom = 0;
+            for (NSDictionary *resultObject in successResult) {
+                CGRect blockFrame = [resultObject[@"frame"] CGRectValue];
+                
+                minLeft = fmin(minLeft, blockFrame.origin.x);
+                maxRight = fmax(maxRight, blockFrame.origin.x + blockFrame.size.width);
+                minTop = fmin(minTop, blockFrame.origin.y);
+                maxBottom = fmax(maxBottom, blockFrame.origin.y + blockFrame.size.height);
+            }
+            
+            //offset: Use largest scale value to offset AVLayerVideoGravityResizeAspectFill width difference (Portrait mode only)
+            CGRect resizedRect = CGRectMake(minLeft * yscale / 2,
+                                            minTop * yscale,
+                                            (maxRight - minLeft) * yscale,
+                                            (maxBottom - minTop) * yscale);
+            
+            //Check if rect is between min & max threshold
+            float rectArea = resizedRect.size.width * resizedRect.size.height;
+            float viewArea = self.blockDrawingView.frame.size.width * self.blockDrawingView.frame.size.height;
+            int textBlockToViewRatio = round(rectArea / viewArea * 100);
+            if (self.textBlockMinThreshold <= textBlockToViewRatio && textBlockToViewRatio <= self.textBlockMaxThreshold) {
+                [DrawingUtility addRectangle:resizedRect toView:self.blockDrawingView
+                                   withColor:[self colorFromHexString:self.textBlockGoodStrokeColor]
+                                    andWidth:self.textBlockGoodStrokeWidth
+                 ];
+                
+                [self onTextBlock:successResult errorMessage:nil];
+            } else {
+                [DrawingUtility addRectangle:resizedRect toView:self.blockDrawingView
+                                   withColor:[self colorFromHexString:self.textBlockBadStrokeColor]
+                                    andWidth:self.textBlockBadStrokeWidth
+                 ];
+                
+                //rect doesn't pass threshold check, return empty array as result instead
+                [self onTextBlock:@[] errorMessage:nil];
+            }
+            
+            self.isTextBlockDetectionRunning = false;
+        });
+    } error:^(NSString *errorMessage) {
+        [self onTextBlock:nil errorMessage:errorMessage];
+        
+        dispatch_async (dispatch_get_main_queue(), ^{
+            // Remove all previous drawing
+            NSArray *viewsToRemove = [self.blockDrawingView subviews];
+            for (UIView *v in viewsToRemove) {
+                [v removeFromSuperview];
+            }
+            self.isTextBlockDetectionRunning = false;
+        });
+    }];
+}
+
+- (void)onTextBlock:(NSArray *)result errorMessage:(NSString *)error
+{
+    if (_onTextBlockDetectionChange && _session) {
+        long long milliseconds = (long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
+        NSNumber *time = [NSNumber numberWithLongLong:milliseconds];
+        NSArray *convertedFormatResult;
+        if (result != nil) {
+            convertedFormatResult = [self.textBlockDetector convertResultToRNMapFormat:result];
+        }
+        
+        NSDictionary *event = @{
+                                @"time": time, //just to match return result format with that of Android's
+                                @"result": (result != nil) ? convertedFormatResult : [NSNull null],
+                                @"error": (error != nil) ? error : [NSNull null],
+                                };
+        
+        _onTextBlockDetectionChange(event);
+    }
+}
+                    
+// Create a CGImageRef from sample buffer data
+- (CGImageRef) imageFromSampleBuffer:(CMSampleBufferRef)sampleBuffer
+{
+    CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+    CVPixelBufferLockBaseAddress(imageBuffer,0);
+    
+    uint8_t *baseAddress = (uint8_t *)CVPixelBufferGetBaseAddressOfPlane(imageBuffer, 0);
+    size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
+    size_t width = CVPixelBufferGetWidth(imageBuffer);
+    size_t height = CVPixelBufferGetHeight(imageBuffer);
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    
+    CGContextRef newContext = CGBitmapContextCreate(baseAddress, width, height, 8, bytesPerRow, colorSpace, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+    CGImageRef newImage = CGBitmapContextCreateImage(newContext);
+    CGContextRelease(newContext);
+    
+    CGColorSpaceRelease(colorSpace);
+    CVPixelBufferUnlockBaseAddress(imageBuffer,0);
+    
+    return newImage;
+}
+
+- (UIColor *)colorFromHexString:(NSString *)hexString {
+    unsigned rgbValue = 0;
+    NSScanner *scanner = [NSScanner scannerWithString:hexString];
+    [scanner setScanLocation:1]; // bypass '#' character
+    [scanner scanHexInt:&rgbValue];
+    return [UIColor colorWithRed:((rgbValue & 0xFF0000) >> 16)/255.0 green:((rgbValue & 0xFF00) >> 8)/255.0 blue:(rgbValue & 0xFF)/255.0 alpha:1.0];
 }
 
 @end
