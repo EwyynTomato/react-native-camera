@@ -1080,7 +1080,6 @@ static NSDictionary *defaultFaceDetectorOptions = nil;
            fromConnection:(AVCaptureConnection *)connection
 {
     if (self.canDetectTextBlock) {
-        //TODO: time cooldown
         NSDate *methodFinish = [NSDate date];
         NSTimeInterval timePassed = [methodFinish timeIntervalSinceDate:self.start];
         
